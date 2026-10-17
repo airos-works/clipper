@@ -30,10 +30,10 @@ public:
         else BLooper::MessageReceived(msg);
     }
     void Show() {
-        BMessage message(kShow); message.AddBool("toggle", true);
+        BMessage message(kShowPopup); message.AddBool("toggle", true);
         BMessenger app(kSignature);
         if (app.IsValid()) app.SendMessage(&message, static_cast<BHandler*>(nullptr), 100000);
-        else { char* args[] = {const_cast<char*>("--history")}; be_roster->Launch(kSignature, 1, args); }
+        else be_roster->Launch(kSignature, &message);
     }
 };
 class ClipperFilter : public BInputServerFilter {

@@ -7,21 +7,26 @@ namespace clipper {
 class ImageView;
 class HistoryWindow : public BWindow {
 public:
-    HistoryWindow();
+    explicit HistoryWindow(bool popup = false);
     void Update(const History& history, bool paused, const char* notice = "");
     void Open();
+    void OpenAt(BPoint cursor);
     void Dismiss();
     bool QuitRequested() override;
+    void WindowActivated(bool active) override;
+    void WorkspaceActivated(int32 workspace, bool active) override;
     void MessageReceived(BMessage* msg) override;
     void DispatchMessage(BMessage* msg, BHandler* target) override;
 private:
     void Rebuild();
     void Selection();
     void Send(uint32 what);
+    const bool popup;
+    BString statusText;
     std::vector<Clip> clips;
     BTextControl* search; BListView* list; BStringView* status;
-    BTextView* text; ImageView* image; BCardLayout* previewLayout;
-    BButton* pin; BButton* paste; BButton* copy; BButton* remove; BButton* pause;
+    BTextView* text = nullptr; ImageView* image = nullptr; BCardLayout* previewLayout = nullptr;
+    BButton* pin = nullptr; BButton* paste; BButton* copy; BButton* remove = nullptr; BButton* pause = nullptr;
 };
 class SettingsWindow : public BWindow {
 public:

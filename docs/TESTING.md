@@ -8,9 +8,11 @@ make -j8 all check check-ui build-haiku/fixture build-haiku/paste_integration
 
 `ui_tests` checks search arrow navigation, Enter on a focused Settings button,
 reopening after repeated dismissal, explicit pause/resume labels, a one-pixel-wide
-image preview, and the settings Cancel button and initial focus. It runs against
-an in-memory history and does
-not read or change saved clips.
+image preview, and the settings Cancel button and initial focus. Popup tests
+cover placement on unequal, negative-origin, stacked, and small monitor frames;
+search, selection, and initial focus; repeated Esc/outside-click/focus/workspace
+dismissal; listener cleanup; relocation on reopening; and empty history. It runs
+against an in-memory history and does not read or change saved clips.
 
 `history_tests` checks stable-ID deduplication, newest-first ordering, pin
 protection, count eviction, fuzzy search, rich-text preservation, byte-identical
@@ -52,10 +54,16 @@ Manual coverage:
 1. Select text in the fixture and use Alt+C. Confirm the history's text and source.
 2. Select different text and use Alt+X. Confirm the source text was cut and recorded.
 3. Tap Alt+V. Confirm exactly one ordinary paste of the current clip.
-4. Hold Alt+V at least 350 ms. Release V and Alt; history opens without pasting.
+4. Hold Alt+V at least 350 ms. Release V and Alt; the compact popup opens beside
+   the cursor without pasting. Repeat on each monitor, near all four edges and
+   the seam; the entire popup should stay on the cursor's monitor. Move the cursor
+   elsewhere and reopen to confirm that the old position is not reused.
 5. Search an older clip, navigate with arrows, and Enter. Confirm the fixture's
    pasted payload matches that older clip and history closes.
-6. Shift+Alt+V opens immediately. Escape closes; no paste occurs.
+6. Shift+Alt+V opens the same popup immediately. Escape closes; no paste occurs.
+   Reopen and click another window, the desktop, or Deskbar: the popup closes and
+   the click still reaches that surface. Switch windows/workspaces to dismiss.
+   Repeat dismissal/reopening and verify that the clipboard remains unchanged.
 7. Copy an image. Confirm dimensions, thumbnail, preview, and restored bitmap data
    in `--read-paste`. Also paste into an image-capable application.
 8. Pin a clip; recopy it and restart. Confirm its ID stays stable and pin survives.
@@ -66,6 +74,10 @@ Manual coverage:
 13. Switch focus during paste-back. The app should leave the clip copied and cancel
     injection, rather than paste into a different application.
 14. Check the Deskbar icon, its menu, startup link, and absence of duplicate add-ons.
+15. Open full history from Deskbar, then invoke the popup; only the popup should
+    remain visible. Return through Deskbar and verify full history still offers
+    previews, pins, deletion, and settings. With Clipper stopped, invoke the
+    shortcut and confirm it launches directly into the popup.
 
 The workstation's previous implementation was removed before installing this
 replacement: its executable, boot script, lowercase settings, MIME registration,

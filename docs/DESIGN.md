@@ -18,11 +18,24 @@ search uses a case-insensitive subsequence match. Native bitmap archives and
 Translation Kit image decoding supply thumbnails and the preview. All clipboard
 formats are kept for restoration, independently of the preview renderer.
 
+The Deskbar and `--history` open the full history window. The shortcut and
+`--popup` open a separate compact `HistoryWindow` with search, thumbnails, and
+Copy/Paste actions. Both share the history snapshot and selection behavior; only
+one is shown at a time. Every popup invocation reads the current cursor position,
+uses air/OS's per-monitor display frame (weak-linked, with a `BScreen` fallback
+for standard Haiku), and flips/clamps the popup at the monitor edges. The popup
+has a thin border and no title tab. It takes keyboard focus and dismisses on Esc,
+focus/workspace loss, or an outside mouse-down. A pointer event listener exists
+only while it is open, observes clicks even on non-activating surfaces, and lets
+the destination receive the original click. Dismissal does not restore or paste
+a clip. Opening either view invalidates any pending paste retry.
+
 `Clipper_shortcuts` is an input_server filter. Copy and cut events pass unchanged.
 For Alt+V, the filter saves key-down, starts a 350 ms one-shot timer on a separate
 looper, and swallows repeated key-downs. A quick key-up replays the original paste
-key-down and key-up through input_server. Holding the key opens history and
-consumes the matching key-up; Shift+Alt+V opens immediately. IPC and launching
+key-down and key-up through input_server. Holding the key opens the cursor popup
+and consumes the matching key-up; Shift+Alt+V opens it immediately. The same popup
+request is delivered when Clipper has to be launched. IPC and launching
 happen on the dispatcher thread. Stale timers carry generation IDs and cannot
 open a picker after release. The filter honors mapped `raw_char` for layouts.
 

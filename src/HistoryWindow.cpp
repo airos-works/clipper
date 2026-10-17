@@ -1,4 +1,5 @@
 #include "HistoryWindow.h"
+#include "PopupPlacement.h"
 #include "Protocol.h"
 #include <Application.h>
 #include <Alert.h>
@@ -114,16 +115,34 @@ public:
     int64 id; bool pinned;
 private: BString title,subtitle; BBitmap* thumbnail = nullptr;
 };
-HistoryWindow::HistoryWindow() : BWindow(BRect(160,100,720,770), "Clipper", B_TITLED_WINDOW,
-    B_ASYNCHRONOUS_CONTROLS | B_AUTO_UPDATE_SIZE_LIMITS | B_NOT_ZOOMABLE) {
+HistoryWindow::HistoryWindow(bool popup) : BWindow(BRect(160,100,720,770),
+    popup ? "Clipper popup" : "Clipper", popup ? B_BORDERED_WINDOW_LOOK : B_TITLED_WINDOW_LOOK,
+    B_NORMAL_WINDOW_FEEL, B_ASYNCHRONOUS_CONTROLS | B_AUTO_UPDATE_SIZE_LIMITS | B_NOT_ZOOMABLE
+        | (popup ? B_NOT_MOVABLE | B_NOT_RESIZABLE | B_NOT_MINIMIZABLE | B_NOT_CLOSABLE : 0)),
+    popup(popup) {
     search = new BTextControl("search", "Search:", "", new BMessage(kSearch));
     search->SetModificationMessage(new BMessage(kSearch)); search->TextView()->SetExplicitMinSize(BSize(250, B_SIZE_UNSET));
     search->TextView()->SetToolTip("Search clipboard text, type, or source. Fuzzy matching is supported.");
     auto heading=new BStringView("heading","Clipboard history"); heading->SetFont(be_bold_font);
-    auto help = new BStringView("help", "Tap Alt+V to paste · hold Alt+V for history");
     list = new BListView("clips", B_SINGLE_SELECTION_LIST); list->SetSelectionMessage(new BMessage(kSelected));
-    list->SetInvocationMessage(new BMessage(kChoose)); list->SetExplicitMinSize(BSize(440,280));
+    list->SetInvocationMessage(new BMessage(kChoose)); list->SetExplicitMinSize(popup ? BSize(250,100) : BSize(440,280));
     auto scroll=new BScrollView("history",list,0,false,true,B_FANCY_BORDER);
+    paste=new BButton("paste","Paste",new BMessage(kForcePaste));
+    copy=new BButton("copy","Copy",new BMessage(kCopyOnly));
+    status=new BStringView("status","Copy something to get started.");
+    status->SetTruncation(B_TRUNCATE_END); status->SetExplicitMinSize(BSize(popup ? 100 : 200,B_SIZE_UNSET));
+    status->SetExplicitMaxSize(BSize(B_SIZE_UNLIMITED,B_SIZE_UNSET));
+    if (popup) {
+        auto help = new BStringView("help", "Esc to dismiss");
+        BLayoutBuilder::Group<>(this,B_VERTICAL,8).SetInsets(12)
+            .AddGroup(B_HORIZONTAL).Add(heading).AddGlue().Add(help).End()
+            .Add(search).Add(scroll)
+            .AddGroup(B_HORIZONTAL,8).Add(status).AddGlue().Add(copy).Add(paste).End();
+        // Enter in search/list honors the selection preference; the explicit
+        // Paste button always pastes. Do not redirect search Enter to a default.
+        return;
+    }
+    auto help = new BStringView("help", "Tap Alt+V to paste · hold Alt+V for history");
     text = new BTextView("text preview"); text->MakeEditable(false); text->SetWordWrap(true);
     text->SetViewUIColor(B_DOCUMENT_BACKGROUND_COLOR); text->SetHighUIColor(B_DOCUMENT_TEXT_COLOR);
     auto preview = new BScrollView("preview",text,0,false,true,B_FANCY_BORDER);
@@ -132,16 +151,11 @@ HistoryWindow::HistoryWindow() : BWindow(BRect(160,100,720,770), "Clipper", B_TI
     auto deck = new BView("preview deck", 0); previewLayout = new BCardLayout(); deck->SetLayout(previewLayout);
     previewLayout->AddView(preview); previewLayout->AddView(image);
     deck->SetExplicitMinSize(BSize(100,145)); deck->SetExplicitMaxSize(BSize(B_SIZE_UNLIMITED,160));
-    paste=new BButton("paste","Paste",new BMessage(kForcePaste));
-    copy=new BButton("copy","Copy",new BMessage(kCopyOnly));
     pin=new BButton("pin","Pin",new BMessage(kPin));
     remove=new BButton("delete","Delete",new BMessage(kDelete));
     auto clear=new BButton("clear","Clear…",new BMessage(kClear));
     auto settings=new BButton("settings","Settings…",new BMessage(kSettings));
     pause=new BButton("pause","Pause recording",new BMessage(kPause));
-    status=new BStringView("status","Copy something to get started.");
-    status->SetTruncation(B_TRUNCATE_END); status->SetExplicitMinSize(BSize(200,B_SIZE_UNSET));
-    status->SetExplicitMaxSize(BSize(B_SIZE_UNLIMITED,B_SIZE_UNSET));
     BLayoutBuilder::Group<>(this,B_VERTICAL,10).SetInsets(16)
         .AddGroup(B_HORIZONTAL).Add(heading).AddGlue().Add(settings).End()
         .Add(help).Add(search).Add(scroll)
@@ -151,25 +165,56 @@ HistoryWindow::HistoryWindow() : BWindow(BRect(160,100,720,770), "Clipper", B_TI
     SetDefaultButton(paste); CenterOnScreen();
 }
 void HistoryWindow::Dismiss() {
+    if (popup) GetLayout()->Owner()->SetEventMask(0);
     // BWindow counts Hide/Show calls. Repeated dismissal of this popup must
     // not require multiple history shortcuts to make it visible again.
     if (!IsHidden()) Hide();
 }
 bool HistoryWindow::QuitRequested() { Dismiss(); return false; }
+void HistoryWindow::WindowActivated(bool active) {
+    BWindow::WindowActivated(active);
+    if (popup && !active) Dismiss();
+}
+void HistoryWindow::WorkspaceActivated(int32 workspace, bool active) {
+    BWindow::WorkspaceActivated(workspace, active);
+    if (popup && !active) Dismiss();
+}
 void HistoryWindow::Open() {
+    BPoint cursor; uint32 buttons;
+    search->GetMouse(&cursor, &buttons, false);
+    OpenAt(search->ConvertToScreen(cursor));
+}
+void HistoryWindow::OpenAt(BPoint cursor) {
     search->SetText(""); Rebuild();
     if(!clips.empty()) for(int32 i=0;i<list->CountItems();++i) {
         auto item=static_cast<ClipItem*>(list->ItemAt(i));
         if(item->id==clips.front().id) { list->Select(i); break; }
     }
+    if (popup) {
+        SetWorkspaces(1UL << current_workspace());
+        BRect screen = PopupScreenFrame(cursor);
+        float scale = be_plain_font->Size() / 12.0f;
+        BSize minimum = GetLayout()->MinSize();
+        BRect frame = PopupFrame(cursor, BSize(std::max(480 * scale, minimum.Width()),
+            std::max(420 * scale, minimum.Height())), screen);
+        ResizeTo(frame.Width(), frame.Height());
+        MoveTo(frame.LeftTop());
+        // Observe outside clicks without grabbing the pointer or consuming the
+        // click meant for the destination app (including non-activating views).
+        GetLayout()->Owner()->SetEventMask(B_POINTER_EVENTS, B_NO_POINTER_HISTORY);
+    }
     if (IsHidden()) Show();
+    Layout(true);
+    list->ScrollTo(0, 0);
+    list->ScrollToSelection();
     Activate(true); search->MakeFocus(true);
 }
 void HistoryWindow::Update(const History& history, bool paused, const char* notice) {
     clips=history.clips;
-    pause->SetLabel(paused ? "Resume recording" : "Pause recording");
+    if (pause) pause->SetLabel(paused ? "Resume recording" : "Pause recording");
     BString line; line.SetToFormat("%zu clips%s",clips.size(),paused?" · paused":"");
     if (notice && *notice) { line << " · " << notice; }
+    statusText = line;
     status->SetText(line); status->SetToolTip(line.String());
     if(!IsHidden()) Rebuild();
 }
@@ -190,7 +235,13 @@ void HistoryWindow::Rebuild() {
 }
 void HistoryWindow::Selection() {
     auto item=dynamic_cast<ClipItem*>(list->ItemAt(list->CurrentSelection()));
-    paste->SetEnabled(item); copy->SetEnabled(item); pin->SetEnabled(item); remove->SetEnabled(item);
+    paste->SetEnabled(item); copy->SetEnabled(item);
+    if (popup) {
+        status->SetText(item ? statusText.String() : clips.empty()
+            ? "Copy something to get started." : "No matching clips.");
+        return;
+    }
+    pin->SetEnabled(item); remove->SetEnabled(item);
     pin->SetLabel(item && item->pinned?"Unpin":"Pin");
     const Clip* clip=nullptr; if (item) for (const auto& c:clips) if(c.id==item->id) { clip=&c; break; }
     BBitmap* bitmap=clip && clip->kind.FindFirst("Image")==0?Decode(clip->data):nullptr;
@@ -219,6 +270,12 @@ void HistoryWindow::MessageReceived(BMessage* msg) {
     }
 }
 void HistoryWindow::DispatchMessage(BMessage* msg, BHandler* target) {
+    if (popup && msg->what==B_MOUSE_DOWN) {
+        BPoint where;
+        if (msg->FindPoint("screen_where", &where)==B_OK && !Frame().Contains(where)) {
+            Dismiss(); return;
+        }
+    }
     if(msg->what==B_KEY_DOWN) {
         const char* bytes=msg->GetString("bytes","");
         if(bytes[0]==B_ESCAPE) { Dismiss(); return; }

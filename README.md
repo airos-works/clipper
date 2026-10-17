@@ -20,7 +20,9 @@ Install with `pkgman install <file>`, or copy the file into `/boot/system/packag
 ## Using Clipper
 
 - **Tap Alt+V**: paste the current clipboard, normally the last item copied or cut.
-- **Hold Alt+V for 350 ms**, or **Shift+Alt+V**: open searchable clipboard history.
+- **Hold Alt+V for 350 ms**, or **Shift+Alt+V**: open a compact, searchable popup
+  beside the cursor. It stays within that monitor; **Esc**, clicking outside, or
+  switching windows dismisses it without changing the clipboard.
 - Type to search; use **Up/Down** to select, then **Enter** to paste into the
   window you came from. Double-clicking a row or clicking **Paste** does the same.
 - **Copy** restores the selected item without pasting it. **Esc** hides history.
@@ -69,8 +71,9 @@ For a packaged install, remove the development install first, then use
 `/boot/system/apps/Clipper` in `~/config/settings/boot/launch/` for login startup.
 Do not keep packaged and non-packaged input add-ons installed together.
 
-The application starts in the background; `Clipper --history` opens history and
-`Clipper --quit` exits the running instance.
+The application starts in the background; `Clipper --history` opens the full
+history window, `Clipper --popup` opens the cursor popup, and `Clipper --quit`
+exits the running instance.
 
 ## Development
 

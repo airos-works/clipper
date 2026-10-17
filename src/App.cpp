@@ -23,7 +23,10 @@ public:
     App():BApplication(kSignature) {}
     void ArgvReceived(int32 argc,char** argv) override {
         for(int32 i=1;i<argc;++i) {
-            if(strcmp(argv[i],"--history")==0) { wantsHistory=true; if(window) Show(false); }
+            if(strcmp(argv[i],"--history")==0 || strcmp(argv[i],"--popup")==0) {
+                wantsHistory=true; wantsPopup=strcmp(argv[i],"--popup")==0;
+                if(window) Show(false,wantsPopup);
+            }
             else if(strcmp(argv[i],"--quit")==0) PostMessage(B_QUIT_REQUESTED);
         }
     }
@@ -38,19 +41,23 @@ public:
             if(loaded!=B_OK && loaded!=B_ENTRY_NOT_FOUND) notice="Saved history could not be read.";
         }
         window=new HistoryWindow; window->Run();
+        popup=new HistoryWindow(true); popup->Run();
         be_clipboard->StartWatching(be_app_messenger);
         Capture(); Refresh();
         app_info info; GetAppInfo(&info); BDeskbar deskbar;
         if(deskbar.HasItem("Clipper")) deskbar.RemoveItem("Clipper");
         status_t status=deskbar.AddItem(&info.ref);
         if(status!=B_OK) { notice="Could not add the Deskbar icon."; Refresh(); }
-        if(wantsHistory) Show(false);
+        if(wantsHistory) Show(false,wantsPopup);
     }
     void MessageReceived(BMessage* msg) override {
         switch(msg->what) {
             case B_CLIPBOARD_CHANGED: Capture(); break;
-            case kShow: if(window) Show(msg->GetBool("toggle",false)); else wantsHistory=true; break;
-            case kHide: if(window && window->Lock()) { window->Dismiss(); window->Unlock(); } break;
+            case kShow: case kShowPopup:
+                if(window) Show(msg->GetBool("toggle",false),msg->what==kShowPopup);
+                else { wantsHistory=true; wantsPopup=msg->what==kShowPopup; }
+                break;
+            case kHide: Hide(); break;
             case kChoose: Choose(msg->GetInt64("id",0),autoPaste); break;
             case kForcePaste: Choose(msg->GetInt64("id",0),true); break;
             case kCopyOnly: Choose(msg->GetInt64("id",0),false); break;
@@ -86,11 +93,13 @@ public:
     bool QuitRequested() override {
         be_clipboard->StopWatching(be_app_messenger); Save(); BDeskbar().RemoveItem("Clipper");
         if(window && window->Lock()) { window->Quit(); window=nullptr; }
+        if(popup && popup->Lock()) { popup->Quit(); popup=nullptr; }
         return true;
     }
 private:
     void Refresh() {
         if(window && window->Lock()) { window->Update(history,paused,notice.String()); window->Unlock(); }
+        if(popup && popup->Lock()) { popup->Update(history,paused,notice.String()); popup->Unlock(); }
     }
     void Changed() {
         Refresh();
@@ -130,13 +139,27 @@ private:
             } free(tokens);
         }
     }
-    void Show(bool toggle) {
-        if(getenv("CLIPPER_TRACE")) { printf("show toggle=%d hidden=%d\n",toggle,window->IsHidden()); fflush(stdout); }
-        if(window->Lock()) {
-            if(toggle && !window->IsHidden()) window->Dismiss();
-            else { if(window->IsHidden()) RememberTarget(); window->Open(); be_roster->ActivateApp(Team()); }
-            window->Unlock();
+    void Hide() {
+        for (auto picker : {window,popup}) if(picker && picker->Lock()) {
+            picker->Dismiss(); picker->Unlock();
         }
+    }
+    void Show(bool toggle,bool usePopup) {
+        HistoryWindow* picker=usePopup?popup:window;
+        HistoryWindow* other=usePopup?window:popup;
+        if(!picker || !picker->Lock()) return;
+        if(getenv("CLIPPER_TRACE")) { printf("show popup=%d toggle=%d hidden=%d\n",usePopup,toggle,picker->IsHidden()); fflush(stdout); }
+        ++pasteGeneration;
+        if(toggle && !picker->IsHidden()) picker->Dismiss();
+        else {
+            // Preserve the original destination when switching Clipper views,
+            // but use the current app when the user invokes us from elsewhere.
+            app_info active;
+            if(be_roster->GetActiveAppInfo(&active)!=B_OK || active.team!=Team()) RememberTarget();
+            if(other && other->Lock()) { other->Dismiss(); other->Unlock(); }
+            picker->Open(); be_roster->ActivateApp(Team());
+        }
+        picker->Unlock();
     }
     void Choose(int64 id,bool paste) {
         Clip* clip=history.Find(id); if(!clip) return;
@@ -146,7 +169,7 @@ private:
         status_t result=be_clipboard->Commit(); selfCommit=be_clipboard->LocalCount(); be_clipboard->Unlock();
         if(result!=B_OK) { notice="Could not restore the clipboard."; Refresh(); return; }
         notice="";
-        if(window->Lock()) { window->Dismiss(); window->Unlock(); }
+        Hide();
         if(!paste) return;
         if(targetTeam<0 || targetTeam==Team()) { notice="Copied. Switch to your app and press Alt+V."; Refresh(); return; }
         if(targetToken>=0) do_window_action(targetToken,B_BRING_TO_FRONT,BRect(),false);
@@ -172,8 +195,8 @@ private:
         if(getenv("CLIPPER_TRACE")) { printf("paste result=%d\n",(int)result); fflush(stdout); }
         if(result!=B_OK) { notice="Copied. Press Alt+V in your app to paste (paste bridge unavailable or keys held)."; Refresh(); }
     }
-    History history; HistoryWindow* window=nullptr;
-    bool paused=false,persist=true,autoPaste=true,wantsHistory=false,saveQueued=false;
+    History history; HistoryWindow* window=nullptr; HistoryWindow* popup=nullptr;
+    bool paused=false,persist=true,autoPaste=true,wantsHistory=false,wantsPopup=false,saveQueued=false;
     uint32 selfCommit=0; BString notice; team_id targetTeam=-1; int32 targetToken=-1; int64 pasteGeneration=0;
 };
 }
