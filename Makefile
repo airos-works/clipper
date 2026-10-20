@@ -27,8 +27,11 @@ $(BUILD)/%.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(APP_CPPFLAGS) $(CXXFLAGS) -fPIC -MMD -MP -c $< -o $@
 $(BUILD)/history_tests: tests/HistoryTests.cpp $(BUILD)/src/History.o
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(APP_LDFLAGS) -o $@ $^ -lbe $(APP_LDEND)
-check: $(BUILD)/history_tests
+$(BUILD)/startup_tests: tests/StartupTests.cpp $(BUILD)/src/Startup.o
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(APP_LDFLAGS) -o $@ $^ -lbe $(APP_LDEND)
+check: $(BUILD)/history_tests $(BUILD)/startup_tests
 	$(BUILD)/history_tests
+	$(BUILD)/startup_tests
 package: all
 	bash tools/package-haiku.sh
 clean:
@@ -42,7 +45,7 @@ $(BUILD)/paste_integration: tests/PasteIntegration.cpp $(BUILD)/src/History.o
 .PHONY: check-ui icon
 icon:
 	python3 tools/make-icon.py
-$(BUILD)/ui_tests: tests/UITests.cpp $(BUILD)/src/HistoryWindow.o $(BUILD)/src/PopupPlacement.o $(BUILD)/src/History.o
+$(BUILD)/ui_tests: tests/UITests.cpp $(BUILD)/src/HistoryWindow.o $(BUILD)/src/PopupPlacement.o $(BUILD)/src/Startup.o $(BUILD)/src/History.o
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(APP_LDFLAGS) -o $@ $^ -lbe -ltranslation $(APP_LDEND)
 check-ui: $(BUILD)/ui_tests
 	$(BUILD)/ui_tests

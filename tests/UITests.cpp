@@ -1,9 +1,11 @@
 #include "HistoryWindow.h"
 #include "PopupPlacement.h"
 #include "Protocol.h"
+#include "Startup.h"
 #include <Application.h>
 #include <Bitmap.h>
 #include <Button.h>
+#include <CheckBox.h>
 #include <ListView.h>
 #include <Layout.h>
 #include <TextControl.h>
@@ -159,6 +161,8 @@ int main()
     auto* preferences = new SettingsWindow(100, true, true);
     preferences->Show(); snooze(100000); preferences->Lock();
     CHECK(preferences->FindView("cancel") != nullptr);
+    auto* startup = dynamic_cast<BCheckBox*>(preferences->FindView("startup"));
+    CHECK(startup && (startup->Value()==B_CONTROL_ON)==StartupEnabled());
     CHECK(preferences->CurrentFocus() == dynamic_cast<BTextControl*>(preferences->FindView("limit"))->TextView());
     preferences->Quit();
     std::printf("UI tests: %d failures\n", failures);

@@ -36,7 +36,12 @@ all clipboard formats. Image rows have thumbnails and a larger preview; text row
 have a readable preview. Fuzzy search covers text, source application, and type.
 The interface follows Haiku's system colors and fonts.
 
-**Settings** controls the history limit (10–1000, default 100), persistence, and
+**Settings** includes **Start Clipper when the computer starts**. Enable it and
+click **Save** to launch Clipper in the background at login; uncheck it to stop
+automatic startup. Existing startup links are recognized. Cancel leaves the
+startup choice unchanged, and updates preserve your choice.
+
+Settings also controls the history limit (10–1000, default 100), persistence, and
 paste on selection. The explicit **Paste** button always pastes. History is local under `~/config/settings/Clipper/`, saved
 atomically with owner-only permissions. Pause temporarily disables recording.
 Each clip can be up to **32 MiB**; total history is limited to **128 MiB**. Larger
@@ -57,8 +62,9 @@ make check
 bash tools/install.sh
 ```
 
-This installs `~/config/non-packaged/apps/Clipper`, the two input_server add-ons,
-and a login startup link. Existing Clipper history is preserved during updates.
+This installs `~/config/non-packaged/apps/Clipper` and the two input_server add-ons.
+Enable login startup in Settings. Existing Clipper history and startup choices
+are preserved during updates.
 No input_server restart is needed; allow a few seconds for add-on activation.
 
 ```sh
@@ -67,8 +73,8 @@ make package                      # artifacts/clipper-1.0.0-2-x86_64.hpkg
 ```
 
 For a packaged install, remove the development install first, then use
-`pkgman install <package>`. Launch Clipper from Applications, and create a link to
-`/boot/system/apps/Clipper` in `~/config/settings/boot/launch/` for login startup.
+`pkgman install <package>`. Launch Clipper from Applications and enable login
+startup in Settings if desired.
 Do not keep packaged and non-packaged input add-ons installed together.
 
 The application starts in the background; `Clipper --history` opens the full

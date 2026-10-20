@@ -33,6 +33,6 @@ public:
     SettingsWindow(int32 limit, bool persist, bool autoPaste);
     void MessageReceived(BMessage* msg) override;
 private:
-    BTextControl* limit; BCheckBox* persist; BCheckBox* autoPaste;
+    BTextControl* limit; BCheckBox* persist; BCheckBox* autoPaste; BCheckBox* startup;
 };
 }

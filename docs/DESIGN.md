@@ -13,6 +13,13 @@ A bounded versioned archive is saved using a private temporary file, file sync,
 and atomic rename. A corrupt archive is reported; capturing new content replaces it on the next save.
 Disabling persistence removes the saved history while retaining the live session.
 
+The startup checkbox reads `~/config/settings/boot/launch/Clipper` rather than a
+second saved boolean. Save atomically creates/updates that symlink to the running
+executable, or removes it when disabled. Existing installer-created links are
+recognized; unrelated regular files and directories are preserved and reported
+as conflicts. Cancel performs no filesystem operation. Installation does not
+override the user's startup choice.
+
 The window takes its own snapshot while locked and rebuilds previews when visible. Its list groups pins first;
 search uses a case-insensitive subsequence match. Native bitmap archives and
 Translation Kit image decoding supply thumbnails and the preview. All clipboard

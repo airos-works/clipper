@@ -19,6 +19,12 @@ protection, count eviction, fuzzy search, rich-text preservation, byte-identical
 native bitmap roundtrip through persistence, invalid archive rejection, empty
 clipboard rejection, and maximum clip size. Temporary archives live under `/tmp`.
 
+`startup_tests` uses a temporary directory to verify enabling/disabling login
+startup, repeated saves, existing and stale links, moved executables, invalid
+targets, preservation of conflicting files/directories, and staging cleanup.
+It never changes the user's login startup. The UI test checks that the startup
+checkbox reflects the current login link.
+
 `build-haiku/paste_integration` opens a temporary native paste target, captures
 rich text and a bitmap, opens Clipper, selects each captured item, and verifies
 that the injected paste reaches the original target with every format intact.
@@ -71,6 +77,11 @@ Manual coverage:
 10. Pause recording, copy a unique string, resume, and confirm it was not recorded.
 11. Disable persistence, quit/restart, and confirm saved history is removed.
 12. Open Settings, change the limit and paste preference, save, and restart.
+    Toggle **Start Clipper when the computer starts**, save, and reopen Settings.
+    Confirm `~/config/settings/boot/launch/Clipper` points to the running executable
+    when enabled and is absent when disabled. Cancel must leave it unchanged.
+    Quit and launch using that link to verify background startup. An app update
+    must preserve both enabled and disabled choices.
 13. Switch focus during paste-back. The app should leave the clip copied and cancel
     injection, rather than paste into a different application.
 14. Check the Deskbar icon, its menu, startup link, and absence of duplicate add-ons.

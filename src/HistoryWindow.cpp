@@ -1,5 +1,6 @@
 #include "HistoryWindow.h"
 #include "PopupPlacement.h"
+#include "Startup.h"
 #include "Protocol.h"
 #include <Application.h>
 #include <Alert.h>
@@ -17,6 +18,9 @@
 #include <TranslationUtils.h>
 #include <DataIO.h>
 #include <Screen.h>
+#include <Entry.h>
+#include <Path.h>
+#include <Roster.h>
 #include <cstdio>
 #include <ctime>
 #include <algorithm>
@@ -301,10 +305,12 @@ SettingsWindow::SettingsWindow(int32 cap,bool remember,bool autoValue):BWindow(B
     limit=new BTextControl("limit","History limit (10–1000):",number,nullptr);
     persist=new BCheckBox("persist","Remember history between restarts",nullptr); persist->SetValue(remember);
     autoPaste=new BCheckBox("auto","Paste into the previous app when selecting a clip",nullptr); autoPaste->SetValue(autoValue);
+    startup=new BCheckBox("startup","Start Clipper when the computer starts",nullptr);
+    startup->SetValue(StartupEnabled());
     auto info=new BStringView("info","Images and text are saved locally, up to 128 MiB.");
     auto save=new BButton("save","Save",new BMessage(kSaveSettings));
     auto cancel=new BButton("cancel","Cancel",new BMessage(B_QUIT_REQUESTED));
-    BLayoutBuilder::Group<>(this,B_VERTICAL,12).SetInsets(18).Add(limit).Add(persist).Add(autoPaste).Add(info)
+    BLayoutBuilder::Group<>(this,B_VERTICAL,12).SetInsets(18).Add(startup).Add(limit).Add(persist).Add(autoPaste).Add(info)
         .AddGroup(B_HORIZONTAL).AddGlue().Add(cancel).Add(save).End(); SetDefaultButton(save); CenterOnScreen();
     limit->MakeFocus(true); limit->TextView()->SelectAll();
 }
@@ -312,6 +318,15 @@ void SettingsWindow::MessageReceived(BMessage* msg) {
     if(msg->what!=kSaveSettings) { BWindow::MessageReceived(msg); return; }
     char* end; long cap=strtol(limit->Text(),&end,10);
     if(*end || cap<10 || cap>1000) { (new BAlert("limit","Enter a history limit from 10 to 1000.","OK"))->Go(); return; }
+    app_info app; BPath executable;
+    status_t result=be_app->GetAppInfo(&app);
+    if(result==B_OK) result=BEntry(&app.ref).GetPath(&executable);
+    if(result==B_OK) result=SetStartupEnabled(startup->Value()==B_CONTROL_ON,executable.Path());
+    if(result!=B_OK) {
+        BString error("Could not update login startup: "); error<<strerror(result);
+        (new BAlert("startup",error.String(),"OK",nullptr,nullptr,B_WIDTH_AS_USUAL,B_WARNING_ALERT))->Go();
+        return;
+    }
     BMessage settings(kSaveSettings); settings.AddInt32("limit",cap); settings.AddBool("persist",persist->Value());
     settings.AddBool("auto_paste",autoPaste->Value()); be_app_messenger.SendMessage(&settings); PostMessage(B_QUIT_REQUESTED);
 }
