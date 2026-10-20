@@ -6,7 +6,8 @@ BUILD=${BUILD:-build-haiku}
 NAME=$(awk '$1 == "name" { print $2; exit }' resources/Clipper.PackageInfo)
 VERSION=$(awk '$1 == "version" { print $2; exit }' resources/Clipper.PackageInfo)
 ARCH=$(awk '$1 == "architecture" { print $2; exit }' resources/Clipper.PackageInfo)
-make BUILD="$BUILD" all
+# Cross-built binaries can be packaged on a Haiku machine without its compiler.
+if [[ ${1:-} != --prebuilt ]]; then make BUILD="$BUILD" all; fi
 STAGE=$(mktemp -d /tmp/clipper-package-XXXXXX)
 trap 'rm -rf -- "$STAGE"' EXIT
 mkdir -p "$STAGE/apps" "$STAGE/add-ons/input_server/filters" "$STAGE/add-ons/input_server/devices" \

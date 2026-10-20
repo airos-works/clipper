@@ -4,6 +4,7 @@ Run on Haiku:
 
 ```sh
 make -j8 all check check-ui build-haiku/fixture build-haiku/paste_integration
+make build-haiku/shortcut_tests
 ```
 
 `ui_tests` checks search arrow navigation, Enter on a focused Settings button,
@@ -25,11 +26,22 @@ targets, preservation of conflicting files/directories, and staging cleanup.
 It never changes the user's login startup. The UI test checks that the startup
 checkbox reflects the current login link.
 
+`shortcut_tests` hosts the production filter with an inert input_server base
+class scaffold, and sends its real timer/dispatcher requests to the installed
+Clipper. It checks a single tap's event pair, stale timers, repeat suppression,
+long-press and Shift+Alt+V opening only the compact picker, and injected-paste
+bypass. Run with Clipper both running and stopped to cover launch-on-demand.
+This does not synthesize hardware input through the installed input_server.
+
 `build-haiku/paste_integration` opens a temporary native paste target, captures
 rich text and a bitmap, opens Clipper, selects each captured item, and verifies
 that the injected paste reaches the original target with every format intact.
 The bitmap payload is compared byte for byte. The test also exercises sequential
-paste injections, including restoration of modifier state.
+paste injections, including restoration of modifier state. Pass `--popup` to
+exercise the compact picker; run both modes. Focus stays in Clipper until the
+app restores the original target. The test restores the initial clipboard on
+exit. It requires persistence and recording enabled; back up history before
+running because its test clips are captured normally.
 
 The native fixture provides a standard editable text view and overrides its
 normal clipboard paste method to archive every payload under

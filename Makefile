@@ -41,6 +41,8 @@ $(BUILD)/fixture: tests/Fixture.cpp $(BUILD)/src/History.o
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(APP_LDFLAGS) -o $@ $^ -lbe -ltracker -ltranslation $(APP_LDEND)
 $(BUILD)/paste_integration: tests/PasteIntegration.cpp $(BUILD)/src/History.o
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(APP_LDFLAGS) -o $@ $^ -lbe $(APP_LDEND)
+$(BUILD)/shortcut_tests: tests/ShortcutTests.cpp $(BUILD)/filter/ClipperFilter.o
+	$(CXX) $(CPPFLAGS) $(APP_CPPFLAGS) $(CXXFLAGS) $(APP_LDFLAGS) -o $@ $^ -lbe $(APP_LDEND)
 
 .PHONY: check-ui icon
 icon:

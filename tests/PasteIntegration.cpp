@@ -26,8 +26,11 @@ public:
 };
 class TestApp : public BApplication {
 public:
-    TestApp():BApplication("application/x-vnd.airOS-Clipper-PasteIntegration") {}
+    explicit TestApp(bool popup):BApplication("application/x-vnd.airOS-Clipper-PasteIntegration"), popup(popup) {}
     void ReadyToRun() override {
+        if(!be_clipboard->Lock()) { Fail("initial clipboard lock"); return; }
+        originalClipboard=*be_clipboard->Data(); be_clipboard->Unlock();
+        haveOriginal=true;
         window=new BWindow(BRect(140,140,620,360),"Clipper paste integration",B_TITLED_WINDOW,B_ASYNCHRONOUS_CONTROLS);
         auto sink=new Sink;
         BLayoutBuilder::Group<>(window,B_VERTICAL,8).SetInsets(12).Add(new BStringView("label","Automatic Clipper test: this window receives injected paste.")).Add(sink);
@@ -51,7 +54,14 @@ public:
         } else if(msg->what==kStep) { if(msg->GetInt64("generation",-1)==generation) Step(msg->GetInt32("phase",0)); }
         else BApplication::MessageReceived(msg);
     }
-    bool QuitRequested() override { if(window->Lock()) window->Quit(); return true; }
+    bool QuitRequested() override {
+        if(haveOriginal && be_clipboard->Lock()) {
+            be_clipboard->Clear(); *be_clipboard->Data()=originalClipboard;
+            be_clipboard->Commit(); be_clipboard->Unlock();
+        }
+        if(window && window->Lock()) window->Quit();
+        return true;
+    }
     bool passed=true;
 private:
     void Schedule(int32 phase,bigtime_t delay=600000) { BMessage next(kStep);next.AddInt32("phase",phase);next.AddInt64("generation",generation);BMessageRunner::StartSending(be_app_messenger,&next,delay,1); }
@@ -75,18 +85,20 @@ private:
             Schedule(5,300000);return;
         }
         if(phase==5) {
-            BMessage show(kShow); BMessenger app(kSignature);printf("show valid=%d status=%d\n",app.IsValid(),(int)app.SendMessage(&show));fflush(stdout);Schedule(3);return;
+            BMessage show(popup?kShowPopup:kShow); BMessenger app(kSignature);printf("show valid=%d status=%d\n",app.IsValid(),(int)app.SendMessage(&show));fflush(stdout);Schedule(3);return;
         }
         if(phase==3) {
             History history;if(history.Load(SettingsPath("history").String())!=B_OK) {Fail("history load");return;}
             int64 id=0;for(const auto& clip:history.clips) if((kind==0 && clip.text==sample)||(kind==1 && clip.kind=="Image · 64 × 32")){id=clip.id;break;}
             if(!id){Fail("captured clip missing");return;}
-            // Recover focus if another workstation test activated an application.
-            if(window->Lock()){window->Activate();window->Unlock();}be_roster->ActivateApp(Team());
-            BMessage choose(kChoose);choose.AddInt64("id",id);BMessenger app(kSignature);printf("choose valid=%d status=%d\n",app.IsValid(),(int)app.SendMessage(&choose));fflush(stdout);Schedule(4,2000000);return;
+            // Leave focus in Clipper: returning to this target is the behavior
+            // under test. Explicit Paste works regardless of selection settings.
+            if(strcmp(active.signature,kSignature)!=0) {Fail("picker did not take focus");return;}
+            BMessage choose(kForcePaste);choose.AddInt64("id",id);BMessenger app(kSignature);printf("choose valid=%d status=%d\n",app.IsValid(),(int)app.SendMessage(&choose));fflush(stdout);Schedule(4,2000000);return;
         }
         if(phase==4) Fail("paste did not arrive at the original target");
     }
+    bool popup,haveOriginal=false; BMessage originalClipboard;
     BWindow* window=nullptr;int kind=0;int64 generation=0;std::vector<uint8> expected;const char* sample="Clipper integration: older rich-text item";
 };
-int main(){TestApp app;app.Run();return app.passed?0:1;}
+int main(int argc,char** argv){TestApp app(argc>1 && strcmp(argv[1],"--popup")==0);app.Run();return app.passed?0:1;}

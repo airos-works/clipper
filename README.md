@@ -69,7 +69,7 @@ No input_server restart is needed; allow a few seconds for add-on activation.
 
 ```sh
 bash tools/install.sh --uninstall  # retains saved history
-make package                      # artifacts/clipper-1.0.0-2-x86_64.hpkg
+make package                      # artifacts/clipper-1.0.0-3-x86_64.hpkg
 ```
 
 For a packaged install, remove the development install first, then use
@@ -87,6 +87,11 @@ exits the running instance.
 Linux. `tools/deploy.sh` uses SSH to sync, build, test, install, and package on
 192.168.1.244. Override `CLIPPER_WS_HOST`, `CLIPPER_WS_USER`, or `CLIPPER_WS_KEY`
 for another workstation. No account passwords are included in this repository.
+
+To package cross-built binaries on Haiku without compiling there, copy
+`build-cross/Clipper`, `Clipper_filter`, `Clipper_device`, and `Clipper.rsrc`
+alongside the source tree, then run
+`BUILD=build-cross bash tools/package-haiku.sh --prebuilt`.
 
 See [design](docs/DESIGN.md) and [testing](docs/TESTING.md).
 
